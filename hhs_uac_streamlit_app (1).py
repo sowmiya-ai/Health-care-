@@ -6,8 +6,18 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-file_name = r"C:\Users\hp\Downloads\HHS_Unaccompanied_Alien_Children_Program - HHS_Unaccompanied_Alien_Children_Program.csv"
-raw_df = pd.read_csv(file_name)
+import pandas as pd
+import streamlit as st
+
+# 1. Use the direct CSV export link for your public Google Sheet
+sheet_url = "https://docs.google.com/spreadsheets/d/1yy9nuI2vJmZffKOsXLjSP3aHJFoY4QcyzbbiiTr0U0s/export?format=csv&gid=276980714"
+
+# 2. Read the data directly from the URL instead of a local file
+try:
+    raw_df = pd.read_csv(sheet_url)
+except Exception as e:
+    st.error(f"Failed to connect to Google Sheets. Error: {e}")
+    st.stop()
 
 APP_TITLE = "HHS UAC Predictive Forecasting Dashboard"
 SOURCE_SHEET = "HHS_Unaccompanied_Alien_Children_Program"
