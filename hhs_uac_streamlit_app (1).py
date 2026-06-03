@@ -1,4 +1,3 @@
-
 import re
 from datetime import timedelta
 
@@ -6,18 +5,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import pandas as pd
-import streamlit as st
 
-# 1. Use the direct CSV export link for your public Google Sheet
-sheet_url = "https://docs.google.com/spreadsheets/d/1yy9nuI2vJmZffKOsXLjSP3aHJFoY4QcyzbbiiTr0U0s/export?format=csv&gid=276980714"
-
-# 2. Read the data directly from the URL instead of a local file
-try:
-    raw_df = pd.read_csv(sheet_url)
-except Exception as e:
-    st.error(f"Failed to connect to Google Sheets. Error: {e}")
-    st.stop()
+# Direct Google Sheet URL - loads automatically without prompting
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1yy9nuI2vJmZffKOsXLjSP3aHJFoY4QcyzbbiiTr0U0s/export?format=csv&gid=276980714"
+FORECAST_DAYS_DEFAULT = 14
 
 APP_TITLE = "HHS UAC Predictive Forecasting Dashboard"
 SOURCE_SHEET = "HHS_Unaccompanied_Alien_Children_Program"
@@ -66,7 +57,7 @@ def google_sheet_csv_url(url: str, gid: str | None = None) -> str:
 
 
 @st.cache_data(ttl=300)
-def read_google_sheet(url: str, gid: str | None) -> pd.DataFrame:
+def read_google_sheet(url: str, gid: str | None = None) -> pd.DataFrame:
     csv_url = google_sheet_csv_url(url, gid)
     return pd.read_csv(csv_url)
 
@@ -654,33 +645,18 @@ def main() -> None:
     )
 
     with st.sidebar:
-        st.header("Data Source")
-        source_mode = st.radio("Choose source", ["Upload Excel/CSV", "Google Sheet URL"], index=0)
+        st.header("⚙️ Dashboard Settings")
         forecast_days = st.selectbox("Forecast Days", [7, 14, 21, 30], index=1)
-
-        raw_df = None
-
-        if source_mode == "Upload Excel/CSV":
-            uploaded = st.file_uploader("Upload Excel or CSV", type=["xlsx", "xls", "csv"])
-            if uploaded is not None:
-                raw_df = read_uploaded_file(uploaded)
-            else:
-                st.info("Upload your source file to load dashboard.")
-        else:
-            sheet_url = st.text_input("Google Sheet URL")
-            gid = st.text_input("Sheet GID", value="0")
-            st.caption("The Google Sheet must be shared as Anyone with the link → Viewer, or published as CSV.")
-            if sheet_url:
-                try:
-                    raw_df = read_google_sheet(sheet_url, gid)
-                except Exception as exc:
-                    st.error(f"Unable to read Google Sheet: {exc}")
-
         st.markdown("---")
-        st.caption("Required sheet columns must match the original Google Apps Script headers.")
+        st.caption("📊 Data Source: HHS UAC Google Sheet (auto-loaded)")
+        st.caption("🔄 Data refreshes every 5 minutes")
 
-    if raw_df is None:
-        st.warning("Please upload an Excel/CSV file or enter a public Google Sheet URL.")
+    # Load data directly from Google Sheet without prompting
+    try:
+        with st.spinner("📡 Loading data from Google Sheet..."):
+            raw_df = read_google_sheet(SHEET_URL)
+    except Exception as exc:
+        st.error(f"❌ Unable to connect to Google Sheet: {exc}")
         st.stop()
 
     try:
@@ -690,10 +666,10 @@ def main() -> None:
         ai = build_ai_analysis(data, forecast)
         report = build_report(data, forecast, ai)
     except Exception as exc:
-        st.error(str(exc))
+        st.error(f"❌ Data Processing Error: {str(exc)}")
         st.stop()
 
-    st.caption(f"Latest: {data.iloc[-1]['dateText']} | Records: {len(data):,} | Source sheet logic: {SOURCE_SHEET}")
+    st.caption(f"📅 Latest: {data.iloc[-1]['dateText']} | 📊 Records: {len(data):,} | ✅ Status: Data Loaded Successfully")
 
     tab_dashboard, tab_ai, tab_report, tab_data = st.tabs(["📊 Dashboard", "🤖 AI Analysis", "📄 Report", "🧾 Data Preview"])
 
