@@ -225,14 +225,13 @@ def build_dashboard(data: pd.DataFrame, forecast: pd.DataFrame) -> dict:
 def build_arima_forecast(data: pd.DataFrame, days: int) -> pd.DataFrame:
     """
     Simple ARIMA-style forecast using exponential smoothing
-    (requires: pip install statsmodels)
+    
     """
     try:
         from statsmodels.tsa.holtwinters import ExponentialSmoothing
     except:
         # Fallback to simple exponential smoothing
-        return build_forecast(data, days)  # Use default if library not available
-    
+        return build_forecast(data, days) 
     try:
         # Fit exponential smoothing model
         model = ExponentialSmoothing(
