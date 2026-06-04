@@ -794,5 +794,3 @@ accuracy_metrics = {
 if __name__ == "__main__":
     main()
 
-def standard_deviation(series) -> float:arr = pd.Series(series).dropna()if arr.empty:return 0
-def standard_deviation(series) -> float:arr = pd.Series(series).dropna()if arr.empty:return 0
