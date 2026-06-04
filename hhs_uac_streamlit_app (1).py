@@ -138,13 +138,37 @@ def risk_level(net_pressure: float) -> str:
 def signed_number(value: float) -> str:
     value = int(round(value or 0))
     return f"+{value:,}" if value > 0 else f"{value:,}"
-def calculate_forecast_accuracy(data: pd.DataFrame) -> dict:
-    """Calculate MAPE, MAE, RMSE for walk-forward validation"""
-    # Use last 60 days for backtesting
-    # Compare forecasts from 2 weeks ago vs actual realized values
-    # Return accuracy metrics
-    pass
 
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+
+def calculate_forecast_accuracy(data):
+
+    actual = data["hhsCare"]
+
+    train_size = int(len(actual) * 0.8)
+
+    train = actual[:train_size]
+    test = actual[train_size:]
+
+    predictions = []
+
+    for i in range(len(test)):
+        predictions.append(train.iloc[-1])
+
+    mae = mean_absolute_error(test, predictions)
+
+    rmse = np.sqrt(mean_squared_error(test, predictions))
+
+    mape = np.mean(
+        np.abs((test - predictions) / test)
+    ) * 100
+
+    return {
+        "MAE": round(mae,2),
+        "RMSE": round(rmse,2),
+        "MAPE": round(mape,2)
+    }
 def build_forecast(data: pd.DataFrame, days: int) -> pd.DataFrame:
     last14 = data.tail(14)
     avg_transfer = average(last14["transferred"])
@@ -182,9 +206,47 @@ def build_forecast(data: pd.DataFrame, days: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_ml_forecast(data: pd.DataFrame, days: int):
-    """Random Forest or Gradient Boosting ensemble"""
-    pass
+from sklearn.ensemble import RandomForestRegressor
+
+def build_ml_forecast(data, days):
+
+    df = data.copy()
+
+    features = [
+        "lag1",
+        "lag7",
+        "lag14",
+        "roll7",
+        "roll14",
+        "netPressure",
+        "dayofweek",
+        "month"
+    ]
+
+    df = df.dropna()
+
+    X = df[features]
+
+    y = df["hhsCare"]
+
+    model = RandomForestRegressor(
+        n_estimators=200,
+        random_state=42
+    )
+
+    model.fit(X,y)
+
+    future = X.iloc[-1:].copy()
+
+    forecasts = []
+
+    for i in range(days):
+
+        pred = model.predict(future)[0]
+
+        forecasts.append(pred)
+
+    return forecasts
 
 def build_ensemble_forecast(forecast_hybrid, forecast_arima, forecast_ml):
     """Weighted average of all models"""
@@ -222,25 +284,15 @@ def build_dashboard(data: pd.DataFrame, forecast: pd.DataFrame) -> dict:
             "forecastEndCare": forecast_end["hhsCareForecast"],
         },
     }
-def build_arima_forecast(data: pd.DataFrame, days: int) -> pd.DataFrame:
-    """
-    Simple ARIMA-style forecast using exponential smoothing
-    
-    """
-    try:
-        from statsmodels.tsa.holtwinters import ExponentialSmoothing
-    except:
-        # Fallback to simple exponential smoothing
-        return build_forecast(data, days) 
-    try:
-        # Fit exponential smoothing model
-        model = ExponentialSmoothing(
-            data["hhsCare"].values[-60:],  # Last 60 days
-            trend="add",
-            seasonal=None,
-            initialization_method="estimated"
-        )
-        fitted_model = model.fit()
+from statsmodels.tsa.arima.model import ARIMA
+ model = ARIMA(
+    data["hhsCare"],
+    order=(2,1,2)
+)
+
+fit = model.fit()
+
+forecast_values = fit.forecast(days)
         
         # Forecast
         forecast_values = fitted_model.forecast(steps=days)
@@ -280,21 +332,6 @@ def model_comparison_chart(forecast_hybrid: pd.DataFrame,
         line=dict(color="#1e40af", dash="solid")
     ))
     
-    # ARIMA forecast
-    if not forecast_arima.empty:
-        fig.add_trace(go.Scatter(
-            x=forecast_arima["date"], y=forecast_arima["hhsCareForecast"],
-            mode="lines", name="ARIMA Model",
-            line=dict(color="#dc2626", dash="dash")
-        ))
-    
-    fig.update_layout(
-        height=400,
-        title="Forecast Model Comparison",
-        yaxis_title="Children in HHS Care",
-        legend=dict(orientation="h")
-    )
-    return fig
 
 def build_recommendation(status: str) -> str:
     if status == "High Capacity Stress":
@@ -508,13 +545,21 @@ def panel(title: str, body_html: str) -> None:
         f"""<div class="panel"><div class="panel-title">{title}</div>{body_html}</div>""",
         unsafe_allow_html=True,
     )
-def perform_eda(data: pd.DataFrame) -> dict:
-    """Time-series decomposition, seasonality, trend analysis"""
-    # Trend, Seasonality, Residuals
-    # Day-of-week analysis
-    # Holiday effects
-    # Volatility clustering
-    pass
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+def perform_eda(data):
+
+    decomposition = seasonal_decompose(
+        data["hhsCare"],
+        period=7,
+        model="additive"
+    )
+
+    return {
+        "trend": decomposition.trend,
+        "seasonal": decomposition.seasonal,
+        "residual": decomposition.resid
+    }
 
 def care_forecast_chart(data: pd.DataFrame, forecast: pd.DataFrame) -> go.Figure:
     actual = data.tail(30)
